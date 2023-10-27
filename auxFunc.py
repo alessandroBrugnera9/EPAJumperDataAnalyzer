@@ -83,12 +83,14 @@ def getStanceIntervals(allData: np.ndarray) -> np.ndarray:
 
 def getStepIntervals(stanceIntervals: np.ndarray) -> np.ndarray:
     # loop through all the steps skip the first interval
-    # get the last index of each interval and the first index of the next interval
-    # get the smallest interval size of a swing phase interval
+    # get the start index of each interval and the first index of the next interval
+    # each step will start on the stance. Then the swing phase last until the next stance on next step
+    # last step is not considered
+    # get the smallest interval size of a swing/flight phase interval
     swingPhaseIntervalSize = np.inf
-    for i in range(1, stanceIntervals.shape[0]):
-        flighStartIndex = stanceIntervals[i-1, 1]
-        flightEndIndex = stanceIntervals[i, 0]
+    for i in range(0, stanceIntervals.shape[0]-1):
+        flighStartIndex = stanceIntervals[i, 1]
+        flightEndIndex = stanceIntervals[i+1, 0]
         currentSwingPhaseIntervalSize = flightEndIndex - flighStartIndex
         if currentSwingPhaseIntervalSize < swingPhaseIntervalSize:
             swingPhaseIntervalSize = currentSwingPhaseIntervalSize
@@ -97,8 +99,8 @@ def getStepIntervals(stanceIntervals: np.ndarray) -> np.ndarray:
     # create new array using stanceIntervcals as reference
     stepIntervals = np.zeros((stanceIntervals.shape[0], 2), dtype=int)
     for i in range(stanceIntervals.shape[0]):
-        start = stanceIntervals[i, 0] - swingPhaseIntervalSize
-        end = stanceIntervals[i, 1]
+        start = stanceIntervals[i, 0]
+        end = stanceIntervals[i, 1] + swingPhaseIntervalSize
         stepIntervals[i, :] = [start, end]
 
 
