@@ -3,14 +3,16 @@ import numpy as np
 import scipy.io
 from indexes import indexes
 
+
 def loadExperimentData(subfolderName: str) -> np.ndarray:
 
     # Define the folder path
-    script_dir = os.path.dirname(os.path.realpath(__file__))    
+    script_dir = os.path.dirname(os.path.realpath(__file__))
     dataFolder = os.path.join(script_dir, subfolderName)
 
     # Define the list of files to be read
-    fileNames = ['grf.mat', 'hipPos.mat', 'isFlight.mat', 'kneePos.mat', 'motCurr.mat', 'pressure.mat', 'safety.mat']
+    fileNames = ['grf.mat', 'hipPos.mat', 'isFlight.mat',
+                 'kneePos.mat', 'motCurr.mat', 'pressure.mat', 'safety.mat']
 
     # Load the data from all files and concatenate horizontally
     allData = np.empty((0, 0))
@@ -35,13 +37,14 @@ def loadExperimentData(subfolderName: str) -> np.ndarray:
 
     return allData
 
+
 def getStanceIntervals(allData: np.ndarray) -> np.ndarray:
     # Create a list to store the step intervals
     stanceIntervals = []
 
     # Get the interval data for the current interval
     isflight = allData[:, indexes['isFlight']]
-    
+
     inFlight = True
     currentStanceStart = 0
     for i in range(len(isflight)):
@@ -55,10 +58,11 @@ def getStanceIntervals(allData: np.ndarray) -> np.ndarray:
             if not inFlight:
                 inFlight = True
                 currentStanceEnd = i - 1
-                
+
                 # Check if the step interval is longer than 100 data points
                 if (currentStanceEnd - currentStanceStart + 1) >= 100:
-                    stanceIntervals.append([currentStanceStart, currentStanceEnd])
+                    stanceIntervals.append(
+                        [currentStanceStart, currentStanceEnd])
 
     stanceIntervals = np.array(stanceIntervals)
 
@@ -74,11 +78,12 @@ def getStanceIntervals(allData: np.ndarray) -> np.ndarray:
         if np.abs(stepIntervalSizes[i] - stepIntervalSizeMean) < 2 * stepIntervalSizeStd:
             filteredStanceIntervals[unfilteredIntervals] = stanceIntervals[i]
             unfilteredIntervals += 1
-    
-    filteredStanceIntervals = np.copy(filteredStanceIntervals[:unfilteredIntervals])
-    print(f"Filtered {len(stanceIntervals) - unfilteredIntervals} step intervals")
-    return filteredStanceIntervals
 
+    filteredStanceIntervals = np.copy(
+        filteredStanceIntervals[:unfilteredIntervals])
+    print(
+        f"Filtered {len(stanceIntervals) - unfilteredIntervals} step intervals")
+    return filteredStanceIntervals
 
 
 def getStepIntervals(stanceIntervals: np.ndarray) -> np.ndarray:
@@ -86,42 +91,42 @@ def getStepIntervals(stanceIntervals: np.ndarray) -> np.ndarray:
     # get the start index of each interval and the first index of the next interval
     # each step will start on the stance. Then the swing phase last until the next stance on next step
     # last step is not considered
-    # get the smallest interval size of a swing/flight phase interval
-    swingPhaseIntervalSize = np.inf
-    for i in range(0, stanceIntervals.shape[0]-1):
-        flighStartIndex = stanceIntervals[i, 1]
-        flightEndIndex = stanceIntervals[i+1, 0]
-        currentSwingPhaseIntervalSize = flightEndIndex - flighStartIndex
-        if currentSwingPhaseIntervalSize < swingPhaseIntervalSize:
-            swingPhaseIntervalSize = currentSwingPhaseIntervalSize
-            
     # now create the full step interval (stance and swing) for each step
+
     # create new array using stanceIntervcals as reference
-    stepIntervals = np.zeros((stanceIntervals.shape[0], 2), dtype=int)
-    for i in range(stanceIntervals.shape[0]):
+    # ignoring last step
+    stepIntervals = np.zeros((stanceIntervals.shape[0]-1, 2), dtype=int)
+    swingPhaseIntervalSize = np.inf
+    for i in range(stanceIntervals.shape[0]-1):
         start = stanceIntervals[i, 0]
-        end = stanceIntervals[i, 1] + swingPhaseIntervalSize
+        end = stanceIntervals[i+1, 0]
         stepIntervals[i, :] = [start, end]
 
+    # print max and min step interval size
+    stepIntervalsSize = stepIntervals[:, 1] - stepIntervals[:, 0]
+    print(f"Max step interval size: {np.max(stepIntervalsSize)}")
+    print(f"Min step interval size: {np.min(stepIntervalsSize)}")
 
     return stepIntervals
+
 
 def getPaddedKneeAngleVectors(kneeAngle: np.ndarray, stepIntervals: np.ndarray, convertToExtensionOn180: bool = False) -> np.ndarray:
     # get all step intervals and pad them to the same size
     maxIntervalSize = np.max(stepIntervals[:, 1] - stepIntervals[:, 0])
 
-    kneeAngleVectors = np.zeros([ stepIntervals.shape[0],maxIntervalSize])
+    kneeAngleVectors = np.zeros([stepIntervals.shape[0], maxIntervalSize])
     # looping through all step intervals
-    for i in range(1,stepIntervals.shape[0]):
+    for i in range(1, stepIntervals.shape[0]):
         kneeAngleStep = kneeAngle[stepIntervals[i, 0]:stepIntervals[i, 1]]
 
         # Pad the data to match the largest interval size
         paddingSize = maxIntervalSize - len(kneeAngleStep)
-        paddedKneeAngleStep = np.pad(kneeAngleStep, (0, paddingSize), mode='edge')
+        paddedKneeAngleStep = np.pad(
+            kneeAngleStep, (0, paddingSize), mode='edge')
 
         kneeAngleVectors[i-1] = paddedKneeAngleStep
-    
+
     if convertToExtensionOn180:
         kneeAngleVectors = 180 - kneeAngleVectors
-    
+
     return kneeAngleVectors
